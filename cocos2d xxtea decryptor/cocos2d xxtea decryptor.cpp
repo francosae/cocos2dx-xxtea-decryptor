@@ -5,9 +5,18 @@
 #include <iostream>
 #include <vector>
 #include <fstream>
-#include <direct.h>
 #include <functional>
+#include <sys/stat.h>
+#ifdef _WIN32
+#include <direct.h>
 #include "dirent.h"
+#else
+#include <dirent.h>
+#define PATH_SEP "/"
+#endif
+#ifdef _WIN32
+#define PATH_SEP "\\"
+#endif
 
 static std::vector<char> ReadAllBytes(char const* filename)
 {
@@ -53,7 +62,7 @@ void listFiles(const std::string& path, std::function<void(const std::string&)> 
 		while (auto f = readdir(dir)) {
 			if (!f->d_name || f->d_name[0] == '.') continue;
 			if (f->d_type == DT_DIR)
-				listFiles(path + f->d_name + "\\", cb);
+				listFiles(path + f->d_name + PATH_SEP, cb);
 
 			if (f->d_type == DT_REG)
 				cb(path + f->d_name);
@@ -114,9 +123,9 @@ int main(int argc, char* argv[]){
 	const std::string dir = std::string(path).substr(0, std::string(path).find_last_of("/\\") + 1);
 	if(res == 1)
 	{
-		if(path.back() != '\\')
+		if(path.back() != PATH_SEP[0])
 		{
-			path.append("\\");
+			path.append(PATH_SEP);
 		}
 		listFiles(path, [sign, key, path, dir](const std::string& path2) {
 			size_t len;
@@ -124,13 +133,13 @@ int main(int argc, char* argv[]){
 			std::vector<char> data = dataOri;
 			data.erase(data.begin(), data.begin() + static_cast<long>(strlen(sign.c_str())));
 			const char* decryptedData = static_cast<char*>(xxtea_decrypt(data.data(), data.size(), key.c_str(), &len));
-			const std::string outputPath = dir + "\out";
+			const std::string outputPath = dir + PATH_SEP + "out";
 			std::string temp = path2.substr(path.size());
 			if(temp.back() == 'c')
 			{
 				temp.pop_back();
 			}
-			std::string outputFileName = outputPath + "\\" + temp;
+			std::string outputFileName = outputPath + PATH_SEP + temp;
 			std::string path3 =  std::string(outputFileName).substr(0,std::string(outputFileName).find_last_of("/\\"));
 			if (isDir(const_cast<char*>(path3.c_str())) == -1)
 			{
@@ -169,10 +178,10 @@ int main(int argc, char* argv[]){
 		if (decryptedData != nullptr)
 		{
 			const std::string fileName = std::string(path).substr(std::string(path).find_last_of("/\\") + 1);
-			const std::string outputPath = dir + "\out\\";
+			const std::string outputPath = dir + PATH_SEP + "out" + PATH_SEP;
 			if(isDir(const_cast<char*>(outputPath.c_str())) == -1)
 			{
-				if(_mkdir(outputPath.c_str()) == -1)
+				if(makePath(outputPath) != 1)
 				{
 					std::cout << "Failed to create output directory" << std::endl;
 					return -1;
